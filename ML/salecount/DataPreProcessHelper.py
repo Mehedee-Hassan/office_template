@@ -689,8 +689,8 @@ def class_tester():
     df_weathe_processed = myDataProcessHelper.fill_me_weather(df=temp_sale_df_saved,df_weather = df_weather)
     
     try:
-        df_weathe_processed = df_weathe_processed.drop('count')
-        df_weathe_processed = df_weathe_processed.drop('money')
+        df_weathe_processed = df_weathe_processed.drop('count',axis=1)
+        df_weathe_processed = df_weathe_processed.drop('money',axis=1)
     except:
         print('already deleted')
     
