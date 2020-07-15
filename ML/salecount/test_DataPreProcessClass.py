@@ -21,35 +21,18 @@ import datetime as dt
 from datetime import datetime as dtdt
 
 sys.path.append('C:/Users/mehedee/Documents/Python Scripts/office/product_sale_count_prediction/')
+sys.path.append('C:/Users/mehedee/Documents/Python Scripts/office/product_sale_count_prediction/')
 import DataPreProcessHelper as DPPHelper
 
 
 
-
+# ####### START PRE PROCESS ######## #
 # #### READ FILE OF PRODUCT
 
 datapath2 = 'C:\\Users\\mehedee\\Documents\\data\\office_projects\\product_count_prediction\\tenpo01\\poduct_sale\\' 
-
-
-
 ## == sale file data
 datafile = 'sale_4968786112149.csv'
 df_sale= pd.read_csv(datapath2+datafile,  parse_dates=[0])
-
-
-# == read holiday data
-holiday_datapath = 'C:/Users/mehedee/Documents/data/office_projects/'
-holiday_filename = 'holidayjapan.csv'
-
-df_holiday = pd.read_csv(holiday_datapath+holiday_filename,parse_dates=True)
-
-# == special sale data
-
-special_sale_path = 'C:/Users/mehedee/Documents/data/office_projects/product_count_prediction/tenpo01/special_sale/'
-path_special_sale = special_sale_path+'special_sale_data_4538151297025.csv'
-special_sale_df = pd.read_csv(path_special_sale,date_parser=[0])
-
-
 
 
 ##  == start and end date determination 
@@ -68,12 +51,12 @@ df_sale2 = df_sale.set_index('date')
 
 
 temp_sale_df = myDataProcessHelper.date_fillup(df_sale2,start_date=start_date,end_date=end_date,do_avg_flag=True,days_to_avg=7)
+temp_sale_df_saved = temp_sale_df.copy()
+
 
    # def date_fillup(self,df_product_sale,start_date=-1,end_date=-1,do_avg_flag=True,days_to_avg=7,fillup_custom_data_flag=False,fillup_data = -100012349567890001,fill_value_field_name='count'):
 
 temp_sale_df=temp_sale_df.drop('money',axis=1)
-
-
 
 
 # make date features 
@@ -86,6 +69,15 @@ new_temp_df=myDataProcessHelper.get_date_regression_feature_date_index(temp_sale
 
 
 # holiday fillup
+
+
+# == read holiday data
+holiday_datapath = 'C:/Users/mehedee/Documents/data/office_projects/'
+holiday_filename = 'holidayjapan.csv'
+
+df_holiday = pd.read_csv(holiday_datapath+holiday_filename,parse_dates=True)
+
+
 """
 holiday file
            Date   weekday                      Name              Type
@@ -106,11 +98,28 @@ df_holiday = df_holiday.drop('Type',axis=1)
 df_holiday['holiday'] =[1]*len(df_holiday) 
 
 
-new_temp_df = myDataProcessHelper.holiday_date_fillup(df_holiday,start_date = start_date,end_date=end_date)
+new_temp_df2 = myDataProcessHelper.holiday_date_fillup(df_holiday,start_date = start_date,end_date=end_date)
+new_temp_df2 = new_temp_df2.set_index('date')
+
+# concat 
 
 
+if len(new_temp_df2) != len(new_temp_df):
+    print("ERROR # not equal length!")
+
+if new_temp_df2.index[0] != new_temp_df.index[0] or new_temp_df2.index[len(new_temp_df2)-1] != new_temp_df.index[len(new_temp_df)-1] :
+    print("ERROR # not equal date length!")
+
+
+new_temp_df['holiday'] = new_temp_df2['holiday']
 
 # spectial sale 
+# == special sale data
+
+special_sale_path = 'C:/Users/mehedee/Documents/data/office_projects/product_count_prediction/tenpo01/special_sale/'
+path_special_sale = special_sale_path+'special_sale_data_4538151297025.csv'
+special_sale_df = pd.read_csv(path_special_sale,date_parser=[0])
+
 
 """
     sale_start_date sale_end_date
@@ -124,8 +133,6 @@ new_temp_df = myDataProcessHelper.holiday_date_fillup(df_holiday,start_date = st
 
 print(special_sale_df) # sale_start_date sale_end_date
 
-special_sale_start_date = str(special_sale_df.index[0].date())
-special_sale_end_date = str(special_sale_df.index[len(special_sale_df)-1].date())
 
 
 special_sale_df=special_sale_df.sort_values(by=['sale_start_date'])
@@ -133,11 +140,23 @@ special_sale_df['sale_start_date']=pd.to_datetime(special_sale_df['sale_start_da
 
 special_sale_df=special_sale_df.set_index('sale_start_date')
 special_sale_df['special_sale'] =[1]*len(special_sale_df) 
+special_sale_start_date = str(special_sale_df.index[0].date())
+special_sale_end_date = str(special_sale_df.index[len(special_sale_df)-1].date())
 
 
-temp_special_sale_df = myDataProcessHelper.special_sale_date_fillup(special_sale_df,start_date = special_sale_start_date,end_date=special_sale_end_date)
+temp_special_sale_df = myDataProcessHelper.special_sale_date_fillup(special_sale_df,start_date = start_date,end_date=end_date)
 
 
+temp_special_sale_df = temp_special_sale_df.set_index('date')
+
+if len(temp_special_sale_df) != len(new_temp_df):
+    print("ERROR # not equal length!")
+
+if temp_special_sale_df.index[0] != new_temp_df.index[0] or temp_special_sale_df.index[len(temp_special_sale_df)-1] != new_temp_df.index[len(new_temp_df)-1] :
+    print("ERROR # not equal date length!")
+
+
+new_temp_df['special_sale'] = temp_special_sale_df['special_sale']
 
 
 # weather data 
@@ -164,10 +183,29 @@ weather_file_name = 'weather_data_flat_16-20.csv'
 df_weather =pd.read_csv(weather_file_path+weather_file_name, parse_dates=[0])
 
 
-df_weathe_processed = myDataProcessHelper.fill_me_weather(df=df_sale,df_weather = df_weather)
+df_weathe_processed = myDataProcessHelper.fill_me_weather(df=temp_sale_df_saved,df_weather = df_weather)
+
+try:
+    df_weathe_processed = df_weathe_processed.drop('count')
+    df_weathe_processed = df_weathe_processed.drop('money')
+except:
+    print('already deleted')
 
 
 
+if len(df_weathe_processed) != len(new_temp_df):
+    print("ERROR # not equal length!")
+
+if df_weathe_processed.index[0] != new_temp_df.index[0] or df_weathe_processed.index[len(df_weathe_processed)-1] != new_temp_df.index[len(new_temp_df)-1] :
+    print("ERROR # not equal date length!")
 
 
+result = pd.concat([new_temp_df, df_weathe_processed.reindex(new_temp_df.index)], axis=1)
 
+
+processed_sale_save_file_path = datapath2
+processed_sale_save_file_name = 'featured_sale_4968786112149.csv' 
+
+
+result.to_csv(processed_sale_save_file_path+processed_sale_save_file_name, encoding='utf-8')
+# ####### END PRE PROCESS ######## #
