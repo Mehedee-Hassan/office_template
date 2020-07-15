@@ -546,8 +546,12 @@ def class_tester():
     myDataProcessHelper = DPPHelper.DataPreProcessHelper(True)
     
     len(df_sale)
-    df_sale2=df_sale.drop('money',axis=1)
     
+    
+    try:
+        df_sale2=df_sale.drop('money',axis=1)
+    except:
+        print('money field already deleted')
     
     df_sale2 = df_sale.set_index('date')
     
