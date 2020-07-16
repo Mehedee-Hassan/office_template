@@ -1,6 +1,7 @@
     # -*- coding: utf-8 -*-
     """
-    Created on Tue Jun  9 14:15:06 2020
+    Created on Tue Jun  09 14:15:06 2020
+    Updated on Thu Jul  16 11:45:00 2020
     
     @author: mehedee
     @description:
@@ -26,9 +27,9 @@
     class Config:
         
         _path="C:\\Users\\mehedee\\Documents\\data\\weatherdata\\miyazaki_shi\\read\\"
-        _file = "weather_data_miazaki_2016-1.json"
-        _writefile = 'C:\\Users\\mehedee\\Documents\\data\\weatherdata\\miyazaki_shi\\weater_data_miyazaki_shi_2016-1.csv'
-        _csvFile = 'C:\\Users\\mehedee\\Documents\\data\\weatherdata\\miyazaki_shi\\weater_data_miyazaki_shi_2016-1.csv'
+        _file = "weater_data_miyazaki_shi_2016-1to2020-7.json"
+        _writefile = 'C:\\Users\\mehedee\\Documents\\data\\weatherdata\\miyazaki_shi\\weater_data_miyazaki_shi_2016-1to2020-7.csv'
+        _csvFile = 'C:\\Users\\mehedee\\Documents\\data\\weatherdata\\miyazaki_shi\\weater_data_miyazaki_shi_2016-1to2020-7.csv'
         _csvTitle = "date,hour,temperature,rainfall"
         
         def getConfig (self):
@@ -280,5 +281,26 @@
     
     
     
-      
+    """
+    @output data format:
+                date	hour	temperature	rainfall
+            0	2016/1/1	0	7	0
+            1	2016/1/1	300	6	0
+            2	2016/1/1	600	6	0
+            3	2016/1/1	900	8	0
+            4	2016/1/1	1200	12	0
+            5	2016/1/1	1500	13	0
+            6	2016/1/1	1800	10	0
+            7	2016/1/1	2100	9	0
+            8	2016/1/2	0	8	0
+            9	2016/1/2	300	8	0
+            10	2016/1/2	600	9	0
+            11	2016/1/2	900	11	0
+            12	2016/1/2	1200	15	0
+            13	2016/1/2	1500	17	0
+            14	2016/1/2	1800	15	0.4
+            15	2016/1/2	2100	14	0
+
+    
+    """  
     
