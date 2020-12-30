@@ -1,0 +1,639 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Dec 30 18:57:37 2020
+
+@author: mehedee
+"""
+
+import sys
+import pandas as pd
+import numpy as np
+import datetime as dt
+from datetime import datetime as dtdt
+
+sys.path.append('C:/Users/mehedee/Documents/Python Scripts/office/product_sale_count_prediction/20201124/data_preprocess/')
+import DataPreProcessHelper as DPPHelper
+
+
+myDataProcessHelper = DPPHelper.DataPreProcessHelper(True)
+
+
+
+
+
+
+
+
+## ## START DATA BASE CALL ------------##
+
+start_prediction ='2020-10-01'
+prediction_until = '2020-10-30'
+end_prediction = '2020-10-31'
+start_train = ['2016-01-01','2017-01-01','2018-01-01','2019-01-01','2020-01-01']
+
+import sys
+import os
+import psycopg2
+import math
+
+from catboost import CatBoostRegressor
+
+
+import pandas as pd
+import sys
+import pandas as pd
+import numpy as np
+import datetime as dt
+from datetime import datetime as dtdt
+import seaborn as sns
+import xgboost as xgb
+from xgboost import plot_importance, plot_tree
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import matplotlib.pyplot as plt
+import math
+from sklearn.model_selection import GridSearchCV
+
+from scipy import stats
+import statsmodels.api as sm
+from fbprophet import Prophet
+import pandas as pd
+import matplotlib.pyplot as plt
+import pandas as pd
+import holidays
+from datetime import datetime
+
+def getWeatherData(start_date='2016-04-05' ,end_date = '2020-11-30'):
+
+    weather_flat_file = 'C:/Users/mehedee/Documents/Python Scripts/office/product_sale_count_prediction/20201207/data_preprocess/weather_data/weather_data_flat_16-1to-20-11.csv'
+
+    weather_df = pd.read_csv(weather_flat_file)
+    print(start_date,end_date,'<---weather')
+
+    weather_df = weather_df[weather_df['date']>=start_date]
+    weather_df = weather_df[weather_df['date']<=end_date]
+
+
+    return weather_df
+
+
+def getHolidayLibDf(start_date,end_date):
+        from datetime import date
+        import holidays
+
+        jp_holidays = holidays.JP()
+
+        # Print all the holidays in US in year 2018
+        a_list=holidays.JP(years = [2016,2017,2018,2019,2020])
+
+        a_list = list(a_list.keys())
+
+        temp_list = []
+
+        for aitem in a_list:
+            temp_list.append(str(aitem))
+
+
+        holiday_df_merge=pd.DataFrame([])
+        holiday_df_merge['date'] = temp_list
+        holiday_df_merge['holiday']= [1]*len(temp_list)
+
+        holiday_df_merge = holiday_df_merge[holiday_df_merge['date']>=start_date]
+        holiday_df_merge = holiday_df_merge[holiday_df_merge['date']<=end_date]
+        holiday_df_merge['date'] = pd.to_datetime(holiday_df_merge['date'])
+        #print(holiday_df_merge)
+        return holiday_df_merge
+
+def getHolidayDf(holiday_datapath='C:/Users/mehedee/Documents/data/office_projects/',holiday_filename='holidayjapan.csv'):
+    holidayDataPath ='C:/Users/mehedee/Documents/data/office_projects/'
+    holiday_df = pd.read_csv(holiday_datapath+holiday_filename,parse_dates=[0])
+
+    holiday_df2=pd.DataFrame([])
+
+
+
+    for index,row in holiday_df.iterrows():
+
+
+        if row['Type'] == 'National holiday' :
+            holiday_df2 = holiday_df2.append(pd.DataFrame({'ds':row['Date'],'holiday':"JP-Holidays"},index=[0]),ignore_index=True)
+
+
+    holiday_df2['ds'] = pd.to_datetime(holiday_df2['ds'],format='%Y-%m-%d',errors='ignore')
+
+    #holiday_df2['lower_window'] = [-1]*len(holiday_df2)
+    #holiday_df2['upper_window'] = [1]*len(holiday_df2)
+
+
+    return holiday_df2
+
+holiday_datapath = 'C:/Users/mehedee/Documents/data/office_projects/'
+holiday_filename = 'holidayjapan.csv'
+holiday_df2 = getHolidayDf(holiday_datapath,holiday_filename)
+
+
+
+def getHandledTs(feature_engineered_data,holiday_df2,start_size,prediction_size,graph_on =False,test_size=10,add_regressor=[]):
+
+
+
+    propModel = Prophet(holidays=holiday_df2)
+    #propModel = Prophet()
+
+
+    df_prophet = pd.DataFrame([])
+    df_prophet['y'] = feature_engineered_data['count'].values
+    print('DEBUG # <-- end of prophet data')
+    df_prophet['ds'] = feature_engineered_data.index
+
+
+
+    print('DEBUG # <-- end of prophet data')
+
+    XXTrain = df_prophet[start_size:-test_size]
+
+    y_pred = df_prophet [['ds']]
+
+
+    for feature in add_regressor:
+
+        df_prophet[feature] =feature_engineered_data[feature].values
+        propModel.add_regressor(feature)
+
+
+    #start = pd.to_datetime(y_pred.iloc[-1]['ds'])
+    #rng = pd.date_range(start, periods=prediction_size)
+
+    #df2 = pd.DataFrame(rng, columns=['ds'])
+    #y_pred =y_pred.append(df2,ignore_index=True)
+
+
+    print(type(y_pred))
+
+    print(y_pred)
+
+    try:
+        XXTrain=XXTrain.drop('count',axis=1)
+    except:
+        pass
+
+
+    propModel.fit(XXTrain)
+    forecast5 = propModel.predict(y_pred)
+
+
+    zero_clamp_prediction = []
+
+    for a in forecast5['yhat'].values:
+        if a < 0:
+            a = 0
+
+        zero_clamp_prediction.append(a)
+
+
+
+
+
+    y_pred['yhat'] = zero_clamp_prediction
+
+
+    if graph_on==True:
+        f, ax = plt.subplots(figsize=(14,5))
+        y_pred.plot(kind='line',x='ds',y='y',color='red',label='Actual', ax=ax)
+        y_pred.plot(kind='line',x='ds',y='yhat',color='green',label='For ecast',ax=ax)
+        plt.title('Jan and Feb 2020 Forecast vs Actuals')
+        plt.show()
+
+    #% PART 4.5.2
+    #forecast5['y'] = y_pred['y']
+    #forecast5.to_csv('extract_parms__25.csv')
+
+
+    list(forecast5.columns)
+    from_ts_name = ['trend', 'yhat_lower', 'yhat_upper', 'trend_lower', 'trend_upper',   'additive_terms', 'additive_terms_lower', 'additive_terms_upper', 'holidays', 'holidays_lower', 'holidays_upper', 'weekly',  'weekly_lower', 'weekly_upper', 'multiplicative_terms',  'multiplicative_terms_lower', 'multiplicative_terms_upper', 'yhat']
+    print(len(from_ts_name),len(forecast5.columns))
+
+
+    forecast5_allparam=list(forecast5.columns)
+    #forecast5_allparam[1:-1]
+    #forecast5_allparam['y'] = list(df_prophet['y'])
+
+
+    forecast5['y'] = df_prophet ['y']
+
+    return [forecast5,forecast5_allparam]
+
+
+
+def get_TENPOURIAGE_TANPINNIKKEI_COMBINED_ALLDAY(product_id="",shop_id='',DEBUG=False):
+    temppo_code = shop_id
+    shouhin_code = product_id
+
+    TENPOURIAGE_TANPINNIKKEI_COMBINED_ALLDAY = """
+    WITH
+        prodcut_id AS (VALUES ('{0}')),
+        store_id AS (VALUES ('{1}'))
+
+    select to_date(売上日,'YYYYMMDD') as 売上日 , 売上点数
+        from 店舗売上単品日計_201112
+
+    where 店舗コード=(table store_id)
+    and 商品コード=(table prodcut_id)
+
+    UNION ALL
+
+    select to_date(売上日,'YYYYMMDD') as 売上日 , 売上点数
+        from 店舗売上単品日計_200710_dtaka
+
+    where 店舗コード=(table store_id)
+    and 商品コード=(table prodcut_id)
+    and 売上日 < (select 売上日 from 店舗売上単品日計_201112 where 店舗コード=(table store_id) and 商品コード=(table prodcut_id) order by 売上日 asc limit 1)
+
+
+    order by 売上日 asc , 売上点数
+
+    """.format(shouhin_code,temppo_code)
+
+    if DEBUG == True:
+            print ("DEBUG # product sale count from multiple table :",TENPOURIAGE_TANPINNIKKEI_COMBINED_ALLDAY)
+
+    return TENPOURIAGE_TANPINNIKKEI_COMBINED_ALLDAY
+
+
+def insertIntoTanpinYosokuq(shouhin_code , uriagebi,tenpocode,yosokuuriageten,realUriageten):
+
+    query = """insert into  店舗売上単品日計予測_mehedee3( 商品コード, 売上日, 店舗コード,予測売上点数, リアル売上点数)
+    values('{0}','{1}','{2}',{3},{4})""".format(shouhin_code , uriagebi,tenpocode,yosokuuriageten,realUriageten)
+
+
+    return query + ' ;'
+
+
+
+product_list =[]
+DEBUG = True
+
+
+import sys
+import psycopg2
+import pandas as pd
+
+
+product_list =[]
+DEBUG = True
+
+
+
+
+def connectProductSale(product_list  = None,_path=None,shop_id = ''):
+    mydataframe = pd.DataFrame()
+    for product_id in product_list:
+        conn = None
+
+
+        try:
+            if DEBUG ==True:
+                print('Connecting to PostgreSql database...')
+
+
+            conn = psycopg2.connect(host='172.16.3.28' ,dbname="920088", user="kenpin", password="kenpin")
+
+
+            cur = conn.cursor()
+
+
+            if DEBUG ==True:
+                print('PostgreSQL database vestion:')
+
+
+            cur.execute(get_TENPOURIAGE_TANPINNIKKEI_COMBINED_ALLDAY(product_id,shop_id))
+            data = cur.fetchone()
+
+            strline = ""
+            while data is not None:
+
+                new_row = {'date':data[0],'count':data[1]}
+                mydataframe = mydataframe.append(new_row, ignore_index=True)
+
+                data = cur.fetchone()
+
+            cur.close()
+
+
+        except (Exception ,psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+
+                print('DB CLOSED')
+
+        return mydataframe
+
+
+product_list =[]
+DEBUG = True
+
+
+
+
+def specialSaleQueryStr(pid,sid,interval=7):
+
+    SPECIAL_SALE_Q = """
+
+    WITH
+        prodcut_id AS (VALUES ('{0}')),
+        store_id AS (VALUES ('{1}')),
+        days AS (VALUES ({2}))
+
+
+    select
+           --ts.商品コード,
+           to_date(tk.販売開始日,'YYYYMMDD') as 販売開始日,
+           to_date(tk.販売終了日,'YYYYMMDD') as 販売終了日
+
+            --,abs(DATE_PART('day', to_date(tk.納品終了日,'YYYYMMDD')::timestamp - to_date(tk.納品開始日,'YYYYMMDD')::timestamp)) as days
+           from 特売商品 ts,特売企画 tk
+           where ts.店舗コード = (table store_id)
+           and ts.商品コード in (select 商品コード	from 発注勧告商品補助	where 店舗コード = (table store_id) and 削除フラグ='0'	and 自動発注区分='2' )
+           and ts.店舗コード = tk.店舗コード
+           and ts.特売企画コード = tk.特売企画コード
+           and tk.削除フラグ='0'
+           and tk.ＥＯＳ区分='1'
+           and ts.削除フラグ='0'
+           and ts.停止フラグ='0'
+
+           and
+	       abs(DATE_PART('day', to_date(tk.販売終了日,'YYYYMMDD')::timestamp - to_date(tk.販売開始日,'YYYYMMDD')::timestamp))<=(table days)
+           and
+            (tk.特売種別<>'1' and tk.特売種別<>'2')
+
+
+           and 商品コード in ((table prodcut_id))
+           order by  ts.商品コード,tk.販売開始日
+
+    """.format(pid,sid,interval)
+
+    return SPECIAL_SALE_Q
+
+def connectSpecialSale(product_list  = None,shop_id = '',interval=7):
+    mydataframe = pd.DataFrame([])
+    for product_id in product_list:
+        conn = None
+
+
+        try:
+            if DEBUG ==True:
+                print('Connecting to PostgreSql database...')
+            conn = psycopg2.connect(host='172.16.3.28' ,dbname="920088", user="kenpin", password="kenpin")
+
+
+            cur = conn.cursor()
+
+
+            if DEBUG ==True:
+                print('PostgreSQL database vestion:')
+
+
+            cur.execute(specialSaleQueryStr(pid=product_id,sid=shop_id,interval=interval))
+            data = cur.fetchone()
+            temp = []
+            while data is not None:
+
+                new_row = {'datestart':data[0],'dateend':data[1]}
+                temp.append(new_row)
+
+                data = cur.fetchone()
+
+            cur.close()
+
+            mydataframe = pd.DataFrame(temp)
+
+        except (Exception ,psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+
+                print('DB CLOSED')
+
+        return mydataframe
+
+def makeSpecialSaleDf(df=None ,start_date=None ,end_date=None):
+        print('makespecial sale')
+        special_datelist = set()
+        for index,row in df.iterrows():
+
+            #print(row['datestart'],row['dateend'])
+            datelist = pd.date_range(start=row['datestart'], end=row['dateend'])
+
+
+            for a in datelist:
+                special_datelist.add(str(a.date()))
+
+
+
+        ssdf=pd.DataFrame([])
+        ssdf['date'] =list(special_datelist)
+        ssdf['date'] =  pd.to_datetime(ssdf['date'])
+
+        ssdf['ss']= [1]*len(special_datelist)
+
+        ssdf = ssdf.sort_values(by ='date' )
+
+        ssdf = ssdf[ssdf['date']>=start_date]
+        ssdf = ssdf[ssdf['date']<=end_date]
+
+        print('DEBUG #: ssdf',ssdf)
+
+        return ssdf
+
+
+
+
+
+def productList(shop_id = ''):
+    p_list =[]
+
+    conn = None
+
+
+    try:
+        if DEBUG ==True:
+            print('Connecting to PostgreSql database...')
+
+
+        conn = psycopg2.connect(host='172.16.3.28' ,dbname="920088", user="kenpin", password="kenpin")
+
+
+        cur = conn.cursor()
+
+
+        if DEBUG ==True:
+            print('PostgreSQL database vestion:')
+
+        q = """
+        select distinct 商品コード from 店舗売上単品日計_old
+        where 商品コード in
+        (select 商品コード from 発注勧告商品補助 where 店舗コード = '{0}'
+        and 削除フラグ='0' and 自動発注区分='2') and 店舗コード = '{0}'
+        """.format(shop_id)
+        cur.execute(q)
+        data = cur.fetchone()
+
+
+        #print(q)
+        while data is not None:
+
+            p_list.append(data[0])
+            data = cur.fetchone()
+
+        cur.close()
+
+
+    except (Exception ,psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+
+            print('DB CLOSED')
+
+    return p_list
+
+def dateRemoveHyphen(date):
+    list_string = date.split('-')
+
+    return ''.join(list_string)
+
+
+## ## END DB CALL -----------##
+
+pid = '4908851950108'
+p='013'
+
+dd = connectProductSale(product_list  = [pid],_path=None,shop_id = p)
+
+dataarray = []
+
+#datelist = pd.date_range(start=dd.iloc[0]['date'], end=str(dd.iloc[len(dd)-1]['date']))
+datelist = pd.date_range(start=start_train[0], end=str(dd.iloc[len(dd)-1]['date']))
+
+
+dd = dd.set_index('date')
+
+for a in datelist:
+    if a.date() in dd.index:
+        #print(a.date())
+        dataarray.append({'date': str(a.date()), 'count':int(dd.loc[a.date()]['count']) })
+    else:
+        
+        dataarray.append({'date': str(a.date()), 'count': 0})
+
+
+# print(dataarray)
+
+dd = pd.DataFrame(dataarray)
+
+print(dd)
+if len(dd) > 4:
+
+
+
+    print('--start--',p,' ',pid)
+    dd=dd.set_index('date')
+
+    df = dd.copy()
+    df.index = pd.to_datetime(df.index)
+
+    df2 = df.copy()
+
+    df2['date'] = df2.index
+    
+    df2 = df2[df2['date'] <= prediction_until]
+    
+    
+
+
+    df2.index = pd.to_datetime(df2.index)
+
+    df2['dayofmonth'] = df2.index.day
+    df2['dayofweek'] = df2.index.dayofweek
+    df2['quarter'] = df2.index.quarter
+    df2['month'] = df2.index.month
+    df2['year'] = df2.index.year
+    df2['dayofyear'] = df2.index.dayofyear
+    #df2['weekofyear'] = df2.index.weekofyear
+
+
+    df2['weekend_sun']  = [1 if x==5 else 0 for x in df2.index.dayofweek  ]
+    df2['weekend_sat'] = [1 if x==6 else 0 for x in df2.index.dayofweek  ]
+    df2['day_f15'] = [1 if x<=15 else 0 for x in df2.index.day]
+    df2['day_e15'] = [1 if x>15 else 0 for x in df2.index.day]
+    df2['day_e21'] = [1 if x>20 else 0 for x in df2.index.day]
+    df2['day_dayemonth'] = [1 if x==1 else 0 for x in df2.index.day]
+
+
+
+
+
+
+    unknown_future_df = pd.DataFrame([])
+    unknown_future_df['date'] = pd.date_range(start=start_prediction,end=prediction_until)
+
+    
+    weather_df = getWeatherData(start_date=str(df2.index[0].date()) ,end_date = prediction_until)#str(df2.index[len(df2)-1].date()))
+    weather_df['date'] = pd.to_datetime(weather_df['date'])
+
+    pred_weather_df = weather_df[weather_df['date'] > str(df2.index[len(df2)-1].date())]
+    weather_df = weather_df[weather_df['date'] <= str(df2.index[len(df2)-1].date())]
+
+    try:
+        df2 = df2.drop('date',axis=1)
+    except:
+        pass
+
+    df2 =  pd.merge(df2,weather_df,how='left',on=['date'])
+    unknown_future_df = pd.merge(unknown_future_df,pred_weather_df,how='left',left_on=['date'],right_on =['date'])
+
+    
+    try:
+        #drop after merge to remove the date got from weather data
+        df2 = df2.set_index('date')
+    except:
+        pass
+    
+
+
+    # holiday
+    """holiday_df2 = holiday_df2[holiday_df2['ds']>=str(df2.index[0].date())]
+    holiday_df2 = holiday_df2[holiday_df2['ds']<=str(df2.index[len(df2)-1].date())]
+    holiday_df_merge=pd.DataFrame([])
+    holiday_df_merge['date'] = pd.to_datetime(holiday_df2['ds'])
+    holiday_df_merge['holiday']= [1]*len(holiday_df_merge)"""
+
+    # holiday from lib
+    holiday_df3_merge = getHolidayLibDf(start_date = str(df2.index[0].date()) ,end_date=prediction_until) #str(df2.index[len(df2)-1].date()))
+
+    pred_holiday_df3 = holiday_df3_merge[holiday_df3_merge['date'] > str(df2.index[len(df2)-1].date())]
+    holiday_df3_merge = holiday_df3_merge[holiday_df3_merge['date'] <= str(df2.index[len(df2)-1].date())]
+
+
+    df2 =  pd.merge(df2,holiday_df3_merge,how='left',left_on=['date'],right_on =['date'])
+    df2 = df2.fillna(0)
+
+    unknown_future_df = pd.merge(unknown_future_df,pred_holiday_df3,how='left',left_on=['date'],right_on =['date'])
+    unknown_future_df=unknown_future_df.fillna(0)
+
+
+    try:
+        #drop after merge to remove the date got from weather data
+        df2 = df2.set_index('date')
+    except:
+        pass
+
+    new_temp_df=myDataProcessHelper.get_date_regression_feature_date_index(df2)
+
+
+
+
+
