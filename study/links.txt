@@ -1,0 +1,1 @@
+1. EARLY STOPPING : https://machinelearningmastery.com/how-to-stop-training-deep-neural-networks-at-the-right-time-using-early-stopping/
