@@ -1,3 +1,7 @@
+oh = pd.DataFrame({"pid":["4903080988960", "4908837324190", "4901033630904",  "4901033630034"]})
+oh = pd.get_dummies(oh,prefix=None)
+    
+  
 seq[0] = np.array(seq[0])
 seq[1] = np.array(seq[1])
 seq[2] = np.array(seq[2])
